@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import type { Plan, Room } from '@/types'
+import type { Course, Plan, Room } from '@/types'
 
 const props = defineProps<{ plan: Plan }>()
 const route = useRoute()
@@ -34,6 +34,30 @@ function clearSelection() {
   search.value = ''
   router.replace({ name: 'room' })
 }
+
+const detail = ref<{ course: Course; weekday: string; slot: string } | null>(null)
+
+function openDetail(wi: number, si: number) {
+  const room = selectedRoom.value
+  if (!room) return
+  const c = room.schedule[wi][si]
+  if (!c) return
+  detail.value = {
+    course: c,
+    weekday: props.plan.meta.weekdays[wi],
+    slot: props.plan.meta.slots[si].label,
+  }
+}
+
+function closeDetail() {
+  detail.value = null
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeDetail()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -117,8 +141,8 @@ function clearSelection() {
               >
                 <div
                   v-if="selectedRoom.schedule[wi][si]"
-                  class="bg-rose-50 border border-rose-100 rounded p-1 text-rose-900 text-[10px] leading-snug min-h-[2rem]"
-                  :title="`${selectedRoom.schedule[wi][si]!.c}\n${selectedRoom.schedule[wi][si]!.l}\n${selectedRoom.schedule[wi][si]!.t}`"
+                  @click="openDetail(wi, si)"
+                  class="bg-rose-50 border border-rose-100 rounded p-1 text-rose-900 text-[10px] leading-snug min-h-[2rem] cursor-pointer hover:bg-rose-100 hover:border-rose-200 transition-colors"
                 >
                   <div class="font-medium line-clamp-2">{{ selectedRoom.schedule[wi][si]!.c }}</div>
                   <div class="opacity-70 line-clamp-1">{{ selectedRoom.schedule[wi][si]!.t }}</div>
@@ -134,9 +158,47 @@ function clearSelection() {
           空闲 {{ selectedRoom.schedule.flat().filter(s => s === null).length }} /
           占用 {{ selectedRoom.schedule.flat().filter(s => s !== null).length }} 格
         </span>
-        <span class="text-slate-400">hover 单元格看完整信息</span>
+        <span class="text-slate-400">点击课程看完整信息</span>
       </div>
     </section>
+
+    <!-- 课程详情弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="detail"
+        @click.self="closeDetail"
+        class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      >
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-lg font-bold text-slate-900 break-words">{{ detail.course.c }}</div>
+              <div class="text-xs text-slate-500 mt-1">
+                {{ selectedRoom?.id }} · {{ detail.weekday }} · {{ detail.slot }}
+              </div>
+            </div>
+            <button
+              @click="closeDetail"
+              class="text-slate-400 hover:text-slate-700 text-2xl leading-none shrink-0"
+              aria-label="关闭"
+            >×</button>
+          </div>
+          <dl class="px-5 py-4 text-sm space-y-3">
+            <div v-if="detail.course.l">
+              <dt class="text-xs text-slate-500 mb-0.5">班级</dt>
+              <dd class="text-slate-800 break-words">{{ detail.course.l }}</dd>
+            </div>
+            <div v-if="detail.course.t">
+              <dt class="text-xs text-slate-500 mb-0.5">教师</dt>
+              <dd class="text-slate-800 break-words">{{ detail.course.t }}</dd>
+            </div>
+            <div v-if="!detail.course.l && !detail.course.t" class="text-slate-400">
+              该课程未提供更多信息
+            </div>
+          </dl>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
