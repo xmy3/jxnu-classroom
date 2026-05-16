@@ -1,4 +1,4 @@
-import { ref, computed, shallowRef } from 'vue'
+import { ref, computed, shallowRef, onMounted, onUnmounted } from 'vue'
 import type { Plan, Room, Course } from '@/types'
 
 const _plan = shallowRef<Plan | null>(null)
@@ -50,18 +50,95 @@ export function usePlan() {
 
 // 节次 -> 上课时间(江西师范大学瑶湖校区作息),用于在节次旁附时间。
 // 合并规则:连堂取首节开始 + 末节结束;晚上覆盖 10-12 节。
-const SLOT_TIMES: Record<string, string> = {
-  '12': '08:00-09:30',
-  '3': '09:40-10:20',
-  '4': '10:30-11:10',
-  '5': '11:20-12:00',
-  '67': '14:00-15:30',
-  '89': '15:40-17:10',
-  'ev': '19:00-21:20',
+const SLOT_TIME_RANGES: Record<string, [string, string]> = {
+  '12': ['08:00', '09:30'],
+  '3':  ['09:40', '10:20'],
+  '4':  ['10:30', '11:10'],
+  '5':  ['11:20', '12:00'],
+  '67': ['14:00', '15:30'],
+  '89': ['15:40', '17:10'],
+  'ev': ['19:00', '21:20'],
 }
 
 export function slotTime(key: string): string {
-  return SLOT_TIMES[key] ?? ''
+  const r = SLOT_TIME_RANGES[key]
+  return r ? `${r[0]}-${r[1]}` : ''
+}
+
+function toMin(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/** 当前 weekday 索引(周一=0...周日=6) */
+export function currentWeekdayIndex(now: Date = new Date()): number {
+  const d = now.getDay()
+  return d === 0 ? 6 : d - 1
+}
+
+/**
+ * 现在落在 plan.meta.slots 的哪一节?
+ * - 落在某 slot 时间段内 → 返回该 slot 的索引
+ * - 早于第 1 节 → 返回 0(默认引导到上午第一节)
+ * - 在两节之间 → 返回下一节的索引(更贴近“接下来去上课”的语义)
+ * - 晚于最后一节 → 返回最后一节索引
+ */
+export function currentSlotIndex(plan: Plan, now: Date = new Date()): number {
+  const mins = now.getHours() * 60 + now.getMinutes()
+  const slots = plan.meta.slots
+  for (let i = 0; i < slots.length; i++) {
+    const r = SLOT_TIME_RANGES[slots[i].key]
+    if (!r) continue
+    const start = toMin(r[0]), end = toMin(r[1])
+    if (mins < start) return i // 早于该节开始 → 选该节
+    if (mins <= end) return i  // 正在上课
+  }
+  return slots.length - 1
+}
+
+/** 收藏教室(localStorage) */
+const FAV_KEY = 'jxnu-fav-rooms'
+const _favs = ref<string[]>(readFavs())
+
+function readFavs(): string[] {
+  try {
+    const raw = localStorage.getItem(FAV_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeFavs(list: string[]): void {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(list)) } catch {}
+}
+
+// 跨 tab/窗口同步
+function onStorage(e: StorageEvent) {
+  if (e.key === FAV_KEY) _favs.value = readFavs()
+}
+
+export function useFavorites() {
+  onMounted(() => window.addEventListener('storage', onStorage))
+  onUnmounted(() => window.removeEventListener('storage', onStorage))
+  return {
+    favs: computed(() => _favs.value),
+    isFav: (id: string) => _favs.value.includes(id),
+    toggle(id: string) {
+      const i = _favs.value.indexOf(id)
+      const next = i >= 0
+        ? _favs.value.filter(x => x !== id)
+        : [..._favs.value, id]
+      _favs.value = next
+      writeFavs(next)
+    },
+    remove(id: string) {
+      _favs.value = _favs.value.filter(x => x !== id)
+      writeFavs(_favs.value)
+    },
+  }
 }
 
 // 从教室 id 推断建筑编号(W1101 -> "W1",W2201 -> "W2"),

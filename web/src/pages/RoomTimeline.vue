@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { Course, Plan, Room } from '@/types'
-import { slotTime } from '@/composables/usePlan'
+import { slotTime, useFavorites, currentSlotIndex, currentWeekdayIndex } from '@/composables/usePlan'
 
 const props = defineProps<{ plan: Plan }>()
 const route = useRoute()
@@ -61,6 +61,10 @@ function onKeydown(e: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+const { isFav, toggle: toggleFav } = useFavorites()
+const todayWi = computed(() => currentWeekdayIndex())
+const nowSi = computed(() => currentSlotIndex(props.plan))
 </script>
 
 <template>
@@ -108,9 +112,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <!-- 课表 -->
     <section v-if="selectedRoom" class="card overflow-hidden">
       <div class="px-4 py-3 border-b border-slate-100 flex items-baseline justify-between">
-        <div>
+        <div class="flex items-baseline gap-2">
           <span class="text-xl font-bold">{{ selectedRoom.id }}</span>
-          <span class="text-sm text-slate-500 ml-2">{{ selectedRoom.type }}</span>
+          <span class="text-sm text-slate-500">{{ selectedRoom.type }}</span>
+          <button
+            @click="toggleFav(selectedRoom.id)"
+            class="text-lg leading-none px-1 transition-colors"
+            :class="isFav(selectedRoom.id) ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400'"
+            :title="isFav(selectedRoom.id) ? '取消收藏' : '加入我的常用'"
+          >{{ isFav(selectedRoom.id) ? '★' : '☆' }}</button>
         </div>
         <RouterLink to="/" class="text-xs text-slate-500 hover:text-slate-900">
           ← 返回找空教室
@@ -133,15 +143,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               v-for="(s, si) in plan.meta.slots"
               :key="s.key"
               class="border-t border-slate-100"
+              :class="si === nowSi ? 'bg-amber-50/60' : ''"
             >
               <td class="px-2 py-1.5 text-slate-500 whitespace-nowrap leading-tight">
-                <div>{{ s.label }}</div>
+                <div>
+                  {{ s.label }}<span v-if="si === nowSi" class="ml-0.5 text-amber-500" title="当前节次">🕐</span>
+                </div>
                 <div class="text-[10px] text-slate-400 tabular-nums">{{ slotTime(s.key) }}</div>
               </td>
               <td
                 v-for="(_, wi) in plan.meta.weekdays"
                 :key="wi"
                 class="px-0.5 py-0.5 align-middle"
+                :class="wi === todayWi && si === nowSi ? 'ring-1 ring-amber-300 ring-inset' : ''"
               >
                 <div
                   v-if="selectedRoom.schedule[wi][si]"
