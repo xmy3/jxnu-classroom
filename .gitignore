@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Node / Vite / TS
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Local debugging artefacts
+.research/
+*.log
+debug_*.html
+debug_*.json
