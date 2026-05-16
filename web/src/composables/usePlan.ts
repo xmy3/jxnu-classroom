@@ -48,6 +48,22 @@ export function usePlan() {
   }
 }
 
+// 节次 -> 上课时间(江西师范大学瑶湖校区作息),用于在节次旁附时间。
+// 合并规则:连堂取首节开始 + 末节结束;晚上覆盖 10-12 节。
+const SLOT_TIMES: Record<string, string> = {
+  '12': '08:00-09:30',
+  '3': '09:40-10:20',
+  '4': '10:30-11:10',
+  '5': '11:20-12:00',
+  '67': '14:00-15:30',
+  '89': '15:40-17:10',
+  'ev': '19:00-21:20',
+}
+
+export function slotTime(key: string): string {
+  return SLOT_TIMES[key] ?? ''
+}
+
 // 从教室 id 推断建筑编号(W1101 -> "W1",W2201 -> "W2"),
 // 在江西师范大学命名里,W 后第 1 位数字代表教学楼组。
 export function buildingOf(id: string): string {

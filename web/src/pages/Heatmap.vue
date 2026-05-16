@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Plan } from '@/types'
-import { buildingOf, listBuildings } from '@/composables/usePlan'
+import { buildingOf, listBuildings, slotTime } from '@/composables/usePlan'
 
 const props = defineProps<{ plan: Plan }>()
 
@@ -108,17 +108,21 @@ function dayBusynessColor(b: number): string {
 
     <!-- 热力网格 -->
     <section class="card p-2 overflow-x-auto">
-      <table class="w-full text-[10px]" style="border-collapse: separate; border-spacing: 1px;">
+      <table class="text-[10px] mx-auto" style="border-collapse: separate; border-spacing: 1px;">
         <thead>
           <tr>
             <th class="sticky left-0 bg-white z-10 px-1 py-0.5 text-slate-500 text-left"></th>
             <template v-if="mode === 'day'">
-              <th v-for="(s, i) in plan.meta.slots" :key="i" class="text-slate-500 px-0.5 py-0.5">
-                {{ s.label }}
+              <th v-for="(s, i) in plan.meta.slots" :key="i"
+                  class="text-slate-500 px-1 py-1 font-medium leading-tight min-w-[3.75rem]">
+                <div>{{ s.label }}</div>
+                <div class="text-[9px] text-slate-400 font-normal mt-0.5 tabular-nums">
+                  {{ slotTime(s.key) }}
+                </div>
               </th>
             </template>
             <template v-else>
-              <th v-for="(w, i) in plan.meta.weekdays" :key="i" class="text-slate-500 px-0.5 py-0.5">
+              <th v-for="(w, i) in plan.meta.weekdays" :key="i" class="text-slate-500 px-1 py-0.5 min-w-[2rem]">
                 {{ w.replace('周', '') }}
               </th>
             </template>
@@ -126,19 +130,19 @@ function dayBusynessColor(b: number): string {
         </thead>
         <tbody>
           <tr v-for="(room, ri) in visibleRooms" :key="room.id">
-            <td class="sticky left-0 bg-white z-10 pr-1 text-slate-700 whitespace-nowrap text-[10px]">
+            <td class="sticky left-0 bg-white z-10 pr-2 text-slate-700 whitespace-nowrap text-[10px]">
               {{ room.id }}
             </td>
             <template v-if="mode === 'day'">
               <td
                 v-for="(_, si) in plan.meta.slots"
                 :key="si"
-                class="w-5 h-5 rounded-sm"
+                class="h-5 rounded-sm"
                 :class="cellClass(room.schedule[weekday][si] !== null)"
                 :title="
                   room.schedule[weekday][si]
-                    ? `${room.id} ${plan.meta.weekdays[weekday]} ${plan.meta.slots[si].label}\n${room.schedule[weekday][si]!.c} | ${room.schedule[weekday][si]!.t}`
-                    : `${room.id} ${plan.meta.weekdays[weekday]} ${plan.meta.slots[si].label} 空闲`
+                    ? `${room.id} ${plan.meta.weekdays[weekday]} ${plan.meta.slots[si].label} ${slotTime(plan.meta.slots[si].key)}\n${room.schedule[weekday][si]!.c} | ${room.schedule[weekday][si]!.t}`
+                    : `${room.id} ${plan.meta.weekdays[weekday]} ${plan.meta.slots[si].label} ${slotTime(plan.meta.slots[si].key)} 空闲`
                 "
               ></td>
             </template>
@@ -146,7 +150,7 @@ function dayBusynessColor(b: number): string {
               <td
                 v-for="(_, wi) in plan.meta.weekdays"
                 :key="wi"
-                class="w-5 h-5 rounded-sm"
+                class="h-5 rounded-sm"
                 :class="dayBusynessColor(dayBusyness(ri, wi))"
                 :title="`${room.id} ${plan.meta.weekdays[wi]} 占用 ${(dayBusyness(ri, wi) * 100).toFixed(0)}%`"
               ></td>

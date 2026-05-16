@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { Course, Plan, Room } from '@/types'
+import { slotTime } from '@/composables/usePlan'
 
 const props = defineProps<{ plan: Plan }>()
 const route = useRoute()
@@ -35,17 +36,19 @@ function clearSelection() {
   router.replace({ name: 'room' })
 }
 
-const detail = ref<{ course: Course; weekday: string; slot: string } | null>(null)
+const detail = ref<{ course: Course; weekday: string; slot: string; time: string } | null>(null)
 
 function openDetail(wi: number, si: number) {
   const room = selectedRoom.value
   if (!room) return
   const c = room.schedule[wi][si]
   if (!c) return
+  const s = props.plan.meta.slots[si]
   detail.value = {
     course: c,
     weekday: props.plan.meta.weekdays[wi],
-    slot: props.plan.meta.slots[si].label,
+    slot: s.label,
+    time: slotTime(s.key),
   }
 }
 
@@ -131,8 +134,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               :key="s.key"
               class="border-t border-slate-100"
             >
-              <td class="px-2 py-1.5 text-slate-500 whitespace-nowrap">
-                {{ s.label }}
+              <td class="px-2 py-1.5 text-slate-500 whitespace-nowrap leading-tight">
+                <div>{{ s.label }}</div>
+                <div class="text-[10px] text-slate-400 tabular-nums">{{ slotTime(s.key) }}</div>
               </td>
               <td
                 v-for="(_, wi) in plan.meta.weekdays"
@@ -174,7 +178,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <div class="min-w-0">
               <div class="text-lg font-bold text-slate-900 break-words">{{ detail.course.c }}</div>
               <div class="text-xs text-slate-500 mt-1">
-                {{ selectedRoom?.id }} · {{ detail.weekday }} · {{ detail.slot }}
+                {{ selectedRoom?.id }} · {{ detail.weekday }} · {{ detail.slot }}<span v-if="detail.time" class="text-slate-400"> ({{ detail.time }})</span>
               </div>
             </div>
             <button
