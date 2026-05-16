@@ -1,4 +1,4 @@
-# scraper — 江西师大教务系统爬虫
+# scraper — 江西师范大学教务系统爬虫
 
 Python 包,负责 CAS 单点登录 + 抓取教室课表 + 产出 JSON。
 

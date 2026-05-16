@@ -14,7 +14,7 @@ const router = createRouter({
 
 router.afterEach(to => {
   const t = to.meta?.title as string | undefined
-  document.title = t ? `${t} · 江师大空教室` : '江师大空教室'
+  document.title = t ? `${t} · 江西师范大学(瑶湖校区)空教室` : '江西师范大学(瑶湖校区)空教室'
 })
 
 export default router

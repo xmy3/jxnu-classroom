@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     _fix_windows_console_encoding()
     parser = argparse.ArgumentParser(
         prog="jxnu-classroom",
-        description="江西师大空闲教室查询 - 爬虫命令行",
+        description="江西师范大学空闲教室查询 - 爬虫命令行",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 

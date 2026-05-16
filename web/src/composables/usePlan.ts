@@ -49,7 +49,7 @@ export function usePlan() {
 }
 
 // 从教室 id 推断建筑编号(W1101 -> "W1",W2201 -> "W2"),
-// 在江西师大命名里,W 后第 1 位数字代表教学楼组。
+// 在江西师范大学命名里,W 后第 1 位数字代表教学楼组。
 export function buildingOf(id: string): string {
   const m = id.match(/^([A-Z]\d)/)
   return m ? m[1] : id.slice(0, 2)

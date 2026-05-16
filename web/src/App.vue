@@ -25,7 +25,7 @@ const synced = computed(() => {
     <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
       <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
         <h1 class="font-bold text-base sm:text-lg whitespace-nowrap text-slate-900">
-          <span class="text-slate-400 mr-1">📚</span>江师大空教室
+          <span class="text-slate-400 mr-1">📚</span><span class="hidden sm:inline">江西师范大学</span><span class="sm:hidden">江师大</span>(瑶湖)空教室
         </h1>
         <nav class="flex gap-1 ml-auto overflow-x-auto">
           <RouterLink
@@ -61,7 +61,23 @@ const synced = computed(() => {
         {{ plan.meta.semester }} · {{ plan.meta.room_count }} 间教室 · 同步于 {{ synced }}
       </p>
       <p class="mt-1 opacity-70">
-        数据来源:江西师大教务在线 · 仅供参考,临时调课/补课不在此列
+        数据来源:江西师范大学教务在线 · 仅供参考,临时调课/补课不在此列
+      </p>
+      <p class="mt-2 opacity-60">
+        🤖 本项目由
+        <a
+          href="https://claude.com/claude-code"
+          target="_blank"
+          rel="noopener"
+          class="underline hover:text-slate-700"
+        >Claude Code</a>
+        100% 生成 ·
+        <a
+          href="https://github.com/xmy3/jxnu-classroom"
+          target="_blank"
+          rel="noopener"
+          class="underline hover:text-slate-700"
+        >GitHub</a>
       </p>
     </footer>
   </div>

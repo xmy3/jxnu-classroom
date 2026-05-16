@@ -78,7 +78,7 @@ def _extract_password_form_fields(login_html: str) -> dict[str, str]:
 
 
 def _build_jwc_sso_url(jwc_base: str, target_url: str) -> str:
-    """江西师大私有的 SSO 入口 URL 格式。
+    """江西师范大学私有的 SSO 入口 URL 格式。
 
     样例: <jwc>/SSO/login.aspx?targetUrl={base64}<base64(target)>
     其中 "{base64}" 是字面 7 字符,不是 URL 模板。
