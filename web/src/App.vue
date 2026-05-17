@@ -7,8 +7,7 @@ const route = useRoute()
 const { plan, loading, error, reload } = usePlan()
 
 const nav = [
-  { to: '/', label: '找空教室', name: 'free' },
-  { to: '/range', label: '时段空闲', name: 'range' },
+  { to: '/', label: '时段空闲', name: 'range' },
   { to: '/room', label: '教室时段', name: 'room' },
   { to: '/heatmap', label: '热力图', name: 'heatmap' }
 ] as const

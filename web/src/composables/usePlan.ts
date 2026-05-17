@@ -171,15 +171,6 @@ function matchFilter(r: Room, f: RoomFilter): boolean {
   return true
 }
 
-/** 给定 (weekday, slot),返回当前空闲教室 */
-export function findFreeRooms(
-  plan: Plan, weekday: number, slot: number, f: RoomFilter = {}
-): Room[] {
-  return plan.rooms.filter(
-    r => matchFilter(r, f) && r.schedule[weekday][slot] === null
-  )
-}
-
 /** 给定 (weekday, slot),返回当前被占用的教室 + 占用信息 */
 export function findOccupiedRooms(
   plan: Plan, weekday: number, slot: number, f: RoomFilter = {}

@@ -123,7 +123,7 @@ const nowSi = computed(() => currentSlotIndex(props.plan))
           >{{ isFav(selectedRoom.id) ? '★' : '☆' }}</button>
         </div>
         <RouterLink to="/" class="text-xs text-slate-500 hover:text-slate-900">
-          ← 返回找空教室
+          ← 返回时段空闲
         </RouterLink>
       </div>
       <div class="overflow-x-auto">
