@@ -13,7 +13,6 @@ const slot = ref<number>(currentSlotIndex(props.plan))
 const typeFilter = ref<string>('')
 const buildingFilter = ref<string>('')
 const showFilters = ref(false)
-const backToBack = ref(false)
 
 const { favs, isFav } = useFavorites()
 
@@ -29,16 +28,12 @@ function snapNow() {
 const buildings = computed(() => listBuildings(props.plan))
 const types = computed(() => listTypes(props.plan))
 
-const freeRooms = computed(() => {
-  const base = findFreeRooms(props.plan, weekday.value, slot.value, {
+const freeRooms = computed(() =>
+  findFreeRooms(props.plan, weekday.value, slot.value, {
     type: typeFilter.value || undefined,
     building: buildingFilter.value || undefined,
   })
-  if (!backToBack.value) return base
-  const next = slot.value + 1
-  if (next >= props.plan.meta.slots.length) return base
-  return base.filter(r => r.schedule[weekday.value][next] === null)
-})
+)
 
 const totalRoomsInScope = computed(() =>
   props.plan.rooms.filter(r =>
@@ -108,32 +103,23 @@ function favIsFree(roomId: string): boolean {
     </section>
 
     <!-- 时段 -->
-    <section class="card p-4 space-y-3">
-      <div>
-        <h2 class="text-xs font-medium text-slate-500 mb-2">时段</h2>
-        <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-          <button
-            v-for="(s, i) in plan.meta.slots"
-            :key="s.key"
-            @click="slot = i"
-            class="pill text-center leading-tight"
-            :class="[
-              slot === i ? 'pill-active' : 'pill-idle bg-slate-100',
-              i === nowSi && slot !== i && weekday === todayWi ? 'ring-1 ring-amber-300' : '',
-            ]"
-          >
-            <div>{{ s.label }}<span v-if="i === nowSi && weekday === todayWi" class="ml-0.5">🕐</span></div>
-            <div class="text-[9px] opacity-75 tabular-nums">{{ slotTime(s.key) }}</div>
-          </button>
-        </div>
+    <section class="card p-4">
+      <h2 class="text-xs font-medium text-slate-500 mb-2">时段</h2>
+      <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+        <button
+          v-for="(s, i) in plan.meta.slots"
+          :key="s.key"
+          @click="slot = i"
+          class="pill text-center leading-tight"
+          :class="[
+            slot === i ? 'pill-active' : 'pill-idle bg-slate-100',
+            i === nowSi && slot !== i && weekday === todayWi ? 'ring-1 ring-amber-300' : '',
+          ]"
+        >
+          <div>{{ s.label }}<span v-if="i === nowSi && weekday === todayWi" class="ml-0.5">🕐</span></div>
+          <div class="text-[9px] opacity-75 tabular-nums">{{ slotTime(s.key) }}</div>
+        </button>
       </div>
-      <label
-        v-if="slot < plan.meta.slots.length - 1"
-        class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none"
-      >
-        <input v-model="backToBack" type="checkbox" class="accent-slate-900" />
-        连堂 <span class="text-slate-400">(下一节也空闲)</span>
-      </label>
     </section>
 
     <!-- 筛选(可折叠) -->
@@ -193,7 +179,6 @@ function favIsFree(roomId: string): boolean {
       <div class="text-sm">
         <span class="text-2xl font-bold text-emerald-600">{{ freeRooms.length }}</span>
         <span class="text-slate-500 ml-1">/ {{ totalRoomsInScope }} 间空闲</span>
-        <span v-if="backToBack" class="ml-2 text-xs text-slate-400">(连堂)</span>
       </div>
       <div class="text-xs text-slate-500">{{ (freeRatio * 100).toFixed(0) }}% 空闲率</div>
     </div>

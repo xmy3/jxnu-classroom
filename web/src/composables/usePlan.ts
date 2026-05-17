@@ -192,3 +192,23 @@ export function findOccupiedRooms(
   }
   return out
 }
+
+/** 给定 (weekday, slots[]),返回在所有给定 slots 都空闲的教室 */
+export function findFreeRoomsInRange(
+  plan: Plan, weekday: number, slots: number[], f: RoomFilter = {}
+): Room[] {
+  if (slots.length === 0) return []
+  return plan.rooms.filter(
+    r => matchFilter(r, f) && slots.every(si => r.schedule[weekday][si] === null)
+  )
+}
+
+/** 把一组节次索引格式化为"14:00-21:20"形式的总时间区间 */
+export function slotRangeTime(plan: Plan, slots: number[]): string {
+  if (slots.length === 0) return ''
+  const sorted = [...slots].sort((a, b) => a - b)
+  const first = SLOT_TIME_RANGES[plan.meta.slots[sorted[0]].key]
+  const last = SLOT_TIME_RANGES[plan.meta.slots[sorted[sorted.length - 1]].key]
+  if (!first || !last) return ''
+  return `${first[0]}-${last[1]}`
+}
