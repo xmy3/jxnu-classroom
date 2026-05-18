@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Plan } from '@/types'
 import {
-  findFreeRoomsInRange, listBuildings, listTypes,
+  findRoomsInRangeWithStatus, listBuildings,
   slotTime, slotRangeTime,
   currentSlotIndex, currentWeekdayIndex, useFavorites,
 } from '@/composables/usePlan'
@@ -22,13 +22,15 @@ const endSlot = ref<number>(currentSlotIndex(props.plan))
 const multiSlots = ref<Set<number>>(new Set([currentSlotIndex(props.plan)]))
 
 // 筛选
-const typeFilter = ref<string>('')
 const buildingFilter = ref<string>('')
 const showFilters = ref(false)
+// 是否只看空闲教室;关闭时显示全部教室,用颜色区分
+const onlyFree = ref<boolean>(false)
 
 const { isFav } = useFavorites()
 
 const todayWi = computed(() => currentWeekdayIndex())
+const isToday = computed(() => weekday.value === todayWi.value)
 
 // 当前选中的 slot 索引列表 (排序去重)
 const selectedSlots = computed<number[]>(() => {
@@ -46,14 +48,12 @@ const selectedSlots = computed<number[]>(() => {
 watch(mode, (m, prev) => {
   if (m === prev) return
   if (m === 'multi') {
-    // 从 range 切到 multi: 把 [start..end] 平铺成集合
     const a = Math.min(startSlot.value, endSlot.value)
     const b = Math.max(startSlot.value, endSlot.value)
     const out = new Set<number>()
     for (let i = a; i <= b; i++) out.add(i)
     multiSlots.value = out
   } else {
-    // 从 multi 切到 range: 取 min/max
     const arr = [...multiSlots.value]
     if (arr.length === 0) {
       const now = currentSlotIndex(props.plan)
@@ -105,22 +105,19 @@ function presetClear() {
 }
 
 const buildings = computed(() => listBuildings(props.plan))
-const types = computed(() => listTypes(props.plan))
 
-const freeRooms = computed(() => findFreeRoomsInRange(
+const allRooms = computed(() => findRoomsInRangeWithStatus(
   props.plan, weekday.value, selectedSlots.value,
-  {
-    type: typeFilter.value || undefined,
-    building: buildingFilter.value || undefined,
-  },
+  { building: buildingFilter.value || undefined },
 ))
 
-const totalRoomsInScope = computed(() =>
-  props.plan.rooms.filter(r =>
-    (!typeFilter.value || r.type === typeFilter.value) &&
-    (!buildingFilter.value || r.id.startsWith(buildingFilter.value))
-  ).length
+const freeRooms = computed(() => allRooms.value.filter(r => r.free))
+
+const displayRooms = computed(() =>
+  onlyFree.value ? freeRooms.value : allRooms.value
 )
+
+const totalRoomsInScope = computed(() => allRooms.value.length)
 
 const freeRatio = computed(() =>
   totalRoomsInScope.value > 0
@@ -133,214 +130,281 @@ const timeRangeLabel = computed(() => slotRangeTime(props.plan, selectedSlots.va
 const selectedLabels = computed(() =>
   selectedSlots.value.map(i => props.plan.meta.slots[i].label).join(' · ')
 )
+
+const weekdayLabel = computed(() => props.plan.meta.weekdays[weekday.value])
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- 周几 -->
-    <section class="card p-4">
-      <h2 class="text-xs font-medium text-slate-500 mb-2">周几</h2>
-      <div class="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+  <!-- 主问句区:让人第一眼明白这页是干嘛的 -->
+  <section class="mb-5 sm:mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
+      {{ isToday ? '今天' : weekdayLabel }}哪些教室是空的?
+    </h1>
+    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1.5">
+      <span v-if="isToday" class="inline-flex items-center gap-1">
+        <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span class="text-amber-700 dark:text-amber-300">实时</span>
+        ·
+      </span>
+      <span v-if="selectedSlots.length">
+        {{ selectedLabels }}
+        <span v-if="timeRangeLabel" class="text-slate-400 dark:text-zinc-500 tabular-nums ml-1">({{ timeRangeLabel }})</span>
+      </span>
+      <span v-else>请在左侧选择想查的节次</span>
+    </p>
+  </section>
+
+  <!-- 双栏:lg+ 左 320 控制 / 右 结果 -->
+  <div class="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-6 space-y-4 lg:space-y-0">
+    <!-- 左:控制面板 -->
+    <aside class="space-y-3 lg:sticky lg:top-16 lg:self-start lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:pr-1">
+      <!-- 周几 -->
+      <section class="card p-3 sm:p-4">
+        <h2 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2">周几</h2>
+        <div class="grid grid-cols-7 gap-1">
+          <button
+            v-for="(name, i) in plan.meta.weekdays"
+            :key="i"
+            @click="weekday = i"
+            class="py-1.5 rounded-md text-xs transition-colors"
+            :class="[
+              weekday === i
+                ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium'
+                : i === todayWi
+                  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-700/50 dark:hover:bg-amber-900/50'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800',
+            ]"
+          >
+            {{ name.replace('周', '') }}
+          </button>
+        </div>
+      </section>
+
+      <!-- 模式 + 节次 -->
+      <section class="card p-3 sm:p-4 space-y-3">
+        <div>
+          <h2 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2">选择方式</h2>
+          <div class="flex gap-1 bg-slate-100 dark:bg-zinc-800 rounded-lg p-0.5">
+            <button
+              @click="mode = 'range'"
+              class="flex-1 py-1.5 rounded-md text-xs transition-colors"
+              :class="mode === 'range' ? 'bg-white text-slate-900 dark:bg-zinc-700 dark:text-zinc-100 font-medium shadow-sm' : 'text-slate-600 dark:text-zinc-400'"
+            >范围 X→Y</button>
+            <button
+              @click="mode = 'multi'"
+              class="flex-1 py-1.5 rounded-md text-xs transition-colors"
+              :class="mode === 'multi' ? 'bg-white text-slate-900 dark:bg-zinc-700 dark:text-zinc-100 font-medium shadow-sm' : 'text-slate-600 dark:text-zinc-400'"
+            >多选</button>
+          </div>
+        </div>
+
+        <!-- 范围模式 -->
+        <template v-if="mode === 'range'">
+          <div>
+            <h3 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1.5">起始节次</h3>
+            <div class="grid grid-cols-4 gap-1">
+              <button
+                v-for="(s, i) in plan.meta.slots"
+                :key="s.key"
+                @click="pickStart(i)"
+                class="py-1 rounded-md text-xs leading-tight transition-colors"
+                :class="startSlot === i
+                  ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'"
+              >
+                <div>{{ s.label }}</div>
+                <div class="text-[9px] opacity-70 tabular-nums">{{ slotTime(s.key) }}</div>
+              </button>
+            </div>
+          </div>
+          <div>
+            <h3 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1.5">结束节次</h3>
+            <div class="grid grid-cols-4 gap-1">
+              <button
+                v-for="(s, i) in plan.meta.slots"
+                :key="s.key"
+                @click="pickEnd(i)"
+                :disabled="i < startSlot"
+                class="py-1 rounded-md text-xs leading-tight transition-colors"
+                :class="[
+                  endSlot === i
+                    ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700',
+                  i < startSlot ? 'opacity-30 cursor-not-allowed' : '',
+                  i > startSlot && i < endSlot ? 'ring-1 ring-slate-300 dark:ring-zinc-600' : '',
+                ]"
+              >
+                <div>{{ s.label }}</div>
+                <div class="text-[9px] opacity-70 tabular-nums">{{ slotTime(s.key) }}</div>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 多选模式 -->
+        <template v-else>
+          <div>
+            <h3 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1.5">勾选节次</h3>
+            <div class="grid grid-cols-4 gap-1">
+              <button
+                v-for="(s, i) in plan.meta.slots"
+                :key="s.key"
+                @click="toggleMulti(i)"
+                class="py-1 rounded-md text-xs leading-tight transition-colors"
+                :class="multiSlots.has(i)
+                  ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'"
+              >
+                <div>{{ s.label }}</div>
+                <div class="text-[9px] opacity-70 tabular-nums">{{ slotTime(s.key) }}</div>
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <button @click="presetMorning" class="text-[11px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300">整个上午</button>
+            <button @click="presetAfternoon" class="text-[11px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300">整个下午</button>
+            <button @click="presetEvening" class="text-[11px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300">晚上</button>
+            <button @click="presetAllDay" class="text-[11px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300">全天</button>
+            <button @click="presetClear" class="text-[11px] px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 dark:text-rose-300">清空</button>
+          </div>
+        </template>
+      </section>
+
+      <!-- 筛选(可折叠) -->
+      <section class="card overflow-hidden">
         <button
-          v-for="(name, i) in plan.meta.weekdays"
-          :key="i"
-          @click="weekday = i"
-          class="pill flex-1 min-w-[2.75rem]"
-          :class="[
-            weekday === i ? 'pill-active' : 'pill-idle',
-            i === todayWi && weekday !== i ? 'ring-1 ring-amber-300' : '',
-          ]"
+          @click="showFilters = !showFilters"
+          class="w-full px-3 sm:px-4 py-2.5 flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50"
         >
-          {{ name.replace('周', '') }}
-        </button>
-      </div>
-    </section>
-
-    <!-- 模式切换 -->
-    <section class="card p-4 space-y-3">
-      <div>
-        <h2 class="text-xs font-medium text-slate-500 mb-2">选择方式</h2>
-        <div class="flex gap-1.5">
-          <button
-            @click="mode = 'range'"
-            class="pill flex-1"
-            :class="mode === 'range' ? 'pill-active' : 'pill-idle bg-slate-100'"
-          >范围 (X→Y 节)</button>
-          <button
-            @click="mode = 'multi'"
-            class="pill flex-1"
-            :class="mode === 'multi' ? 'pill-active' : 'pill-idle bg-slate-100'"
-          >多选 (任意组合)</button>
-        </div>
-      </div>
-
-      <!-- 范围模式 -->
-      <template v-if="mode === 'range'">
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">起始节次</h3>
-          <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-            <button
-              v-for="(s, i) in plan.meta.slots"
-              :key="s.key"
-              @click="pickStart(i)"
-              class="pill text-center leading-tight"
-              :class="startSlot === i ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >
-              <div>{{ s.label }}</div>
-              <div class="text-[9px] opacity-75 tabular-nums">{{ slotTime(s.key) }}</div>
-            </button>
-          </div>
-        </div>
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">结束节次</h3>
-          <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-            <button
-              v-for="(s, i) in plan.meta.slots"
-              :key="s.key"
-              @click="pickEnd(i)"
-              :disabled="i < startSlot"
-              class="pill text-center leading-tight"
-              :class="[
-                endSlot === i ? 'pill-active' : 'pill-idle bg-slate-100',
-                i < startSlot ? 'opacity-30 cursor-not-allowed' : '',
-                i >= startSlot && i <= endSlot && endSlot !== i ? 'ring-1 ring-slate-300' : '',
-              ]"
-            >
-              <div>{{ s.label }}</div>
-              <div class="text-[9px] opacity-75 tabular-nums">{{ slotTime(s.key) }}</div>
-            </button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 多选模式 -->
-      <template v-else>
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">勾选节次</h3>
-          <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-            <button
-              v-for="(s, i) in plan.meta.slots"
-              :key="s.key"
-              @click="toggleMulti(i)"
-              class="pill text-center leading-tight"
-              :class="multiSlots.has(i) ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >
-              <div>{{ s.label }}</div>
-              <div class="text-[9px] opacity-75 tabular-nums">{{ slotTime(s.key) }}</div>
-            </button>
-          </div>
-        </div>
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">快捷</h3>
-          <div class="flex flex-wrap gap-1.5">
-            <button @click="presetMorning" class="pill pill-idle bg-slate-100">整个上午</button>
-            <button @click="presetAfternoon" class="pill pill-idle bg-slate-100">整个下午</button>
-            <button @click="presetEvening" class="pill pill-idle bg-slate-100">晚上</button>
-            <button @click="presetAllDay" class="pill pill-idle bg-slate-100">全天</button>
-            <button
-              @click="presetClear"
-              class="pill pill-idle bg-rose-50 text-rose-700 hover:bg-rose-100"
-            >清空</button>
-          </div>
-        </div>
-      </template>
-    </section>
-
-    <!-- 筛选(可折叠) -->
-    <section class="card overflow-hidden">
-      <button
-        @click="showFilters = !showFilters"
-        class="w-full px-4 py-3 flex items-center justify-between text-sm text-slate-600 hover:bg-slate-50"
-      >
-        <span>
-          筛选
-          <span v-if="typeFilter || buildingFilter" class="ml-2 text-slate-900 font-medium">
-            {{ [buildingFilter, typeFilter].filter(Boolean).join(' · ') }}
+          <span class="font-medium text-slate-500 dark:text-zinc-400">
+            筛选
+            <span v-if="buildingFilter" class="ml-1 text-slate-900 dark:text-zinc-100 font-medium">
+              · {{ buildingFilter }}
+            </span>
           </span>
-        </span>
-        <span class="text-slate-400">{{ showFilters ? '收起' : '展开' }}</span>
-      </button>
-      <div v-if="showFilters" class="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">教学楼</h3>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              @click="buildingFilter = ''"
-              class="pill"
-              :class="!buildingFilter ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >全部</button>
-            <button
-              v-for="b in buildings"
-              :key="b"
-              @click="buildingFilter = b"
-              class="pill"
-              :class="buildingFilter === b ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >{{ b }}</button>
+          <span class="text-slate-400 dark:text-zinc-500">{{ showFilters ? '收起' : '展开' }}</span>
+        </button>
+        <div v-if="showFilters" class="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3 border-t border-slate-100 dark:border-zinc-800 pt-3">
+          <div>
+            <h3 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-1.5">教学楼</h3>
+            <div class="flex flex-wrap gap-1">
+              <button
+                @click="buildingFilter = ''"
+                class="text-[11px] px-2 py-1 rounded transition-colors"
+                :class="!buildingFilter ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'"
+              >全部</button>
+              <button
+                v-for="b in buildings"
+                :key="b"
+                @click="buildingFilter = b"
+                class="text-[11px] px-2 py-1 rounded transition-colors"
+                :class="buildingFilter === b ? 'bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'"
+              >{{ b }}</button>
+            </div>
           </div>
         </div>
-        <div>
-          <h3 class="text-xs font-medium text-slate-500 mb-2">类型</h3>
-          <div class="flex flex-wrap gap-1.5">
-            <button
-              @click="typeFilter = ''"
-              class="pill"
-              :class="!typeFilter ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >全部</button>
-            <button
-              v-for="t in types"
-              :key="t"
-              @click="typeFilter = t"
-              class="pill"
-              :class="typeFilter === t ? 'pill-active' : 'pill-idle bg-slate-100'"
-            >{{ t }}</button>
-          </div>
-        </div>
-      </div>
-    </section>
+      </section>
+    </aside>
 
-    <!-- 已选时段提示 -->
-    <div
-      v-if="selectedSlots.length > 0"
-      class="text-xs text-slate-500 px-1 flex items-center gap-2 flex-wrap"
-    >
-      <span class="font-medium text-slate-700">已选 {{ selectedSlots.length }} 节</span>
-      <span class="opacity-70">{{ selectedLabels }}</span>
-      <span v-if="timeRangeLabel" class="tabular-nums text-slate-400">{{ timeRangeLabel }}</span>
-    </div>
-
-    <!-- 结果统计 -->
-    <div v-if="selectedSlots.length > 0" class="flex items-center justify-between px-1 pt-1">
-      <div class="text-sm">
-        <span class="text-2xl font-bold text-emerald-600">{{ freeRooms.length }}</span>
-        <span class="text-slate-500 ml-1">/ {{ totalRoomsInScope }} 间全程空闲</span>
-      </div>
-      <div class="text-xs text-slate-500">{{ (freeRatio * 100).toFixed(0) }}% 空闲率</div>
-    </div>
-
-    <!-- 教室列表 -->
-    <section
-      v-if="selectedSlots.length === 0"
-      class="card p-8 text-center text-slate-500"
-    >
-      请先选择至少一节
-    </section>
-    <section
-      v-else-if="freeRooms.length === 0"
-      class="card p-8 text-center text-slate-500"
-    >
-      🚫 没有在所选时段全部空闲的教室
-    </section>
-    <section v-else class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-      <RouterLink
-        v-for="room in freeRooms"
-        :key="room.id"
-        :to="{ name: 'room', query: { id: room.id } }"
-        class="card p-3 hover:shadow-md transition-shadow active:scale-95 relative"
+    <!-- 右:结果 -->
+    <div>
+      <!-- 空状态 -->
+      <section
+        v-if="selectedSlots.length === 0"
+        class="card p-10 text-center text-slate-500 dark:text-zinc-400"
       >
-        <span v-if="isFav(room.id)" class="absolute top-1 right-1.5 text-amber-400 text-xs">★</span>
-        <div class="font-semibold text-slate-900">{{ room.id }}</div>
-        <div class="text-xs text-slate-500 mt-0.5">{{ room.type }}</div>
-      </RouterLink>
-    </section>
+        <div class="text-3xl mb-2 opacity-40">👈</div>
+        <p>请在左侧勾选你想查的节次</p>
+      </section>
+
+      <template v-else>
+        <!-- 大号空闲数 banner -->
+        <div class="mb-3 flex items-baseline gap-2.5 px-0.5">
+          <span class="text-4xl sm:text-5xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums leading-none">
+            {{ freeRooms.length }}
+          </span>
+          <div class="text-sm text-slate-500 dark:text-zinc-400 leading-tight">
+            <div class="font-medium text-slate-700 dark:text-zinc-300">间空闲</div>
+            <div class="text-xs tabular-nums">/ {{ totalRoomsInScope }} 间 · {{ (freeRatio * 100).toFixed(0) }}%</div>
+          </div>
+        </div>
+
+        <!-- 全部 / 只看空闲 切换 -->
+        <div class="flex items-center justify-between mb-3 px-0.5">
+          <div class="flex gap-1 bg-slate-100 dark:bg-zinc-800 rounded-lg p-0.5">
+            <button
+              @click="onlyFree = false"
+              class="px-3 py-1.5 rounded-md text-xs transition-colors"
+              :class="!onlyFree ? 'bg-white text-slate-900 dark:bg-zinc-700 dark:text-zinc-100 font-medium shadow-sm' : 'text-slate-600 dark:text-zinc-400'"
+            >全部 {{ totalRoomsInScope }}</button>
+            <button
+              @click="onlyFree = true"
+              class="px-3 py-1.5 rounded-md text-xs transition-colors"
+              :class="onlyFree ? 'bg-white text-slate-900 dark:bg-zinc-700 dark:text-zinc-100 font-medium shadow-sm' : 'text-slate-600 dark:text-zinc-400'"
+            >只看空闲 {{ freeRooms.length }}</button>
+          </div>
+          <!-- 图例 -->
+          <div v-if="!onlyFree" class="flex items-center gap-3 text-[11px] text-slate-500 dark:text-zinc-400">
+            <span class="inline-flex items-center gap-1">
+              <span class="w-2.5 h-2.5 rounded-sm bg-emerald-200 dark:bg-emerald-700/60"></span>空闲
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <span class="w-2.5 h-2.5 rounded-sm bg-rose-200 dark:bg-rose-700/60"></span>占用
+            </span>
+          </div>
+        </div>
+
+        <section
+          v-if="displayRooms.length === 0"
+          class="card p-10 text-center"
+        >
+          <p class="text-slate-700 dark:text-zinc-200 font-medium">
+            {{ onlyFree ? '该时段所有教室都在上课' : '该范围内没有教室' }}
+          </p>
+          <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1">
+            {{ onlyFree ? '试试切到"全部"或换个时段、教学楼' : '试试放宽教学楼筛选' }}
+          </p>
+        </section>
+
+        <!-- 教室方块:绿色=空闲,红色=占用 -->
+        <section v-else class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
+          <RouterLink
+            v-for="item in displayRooms"
+            :key="item.room.id"
+            :to="{ name: 'room', query: { id: item.room.id } }"
+            :title="item.free
+              ? `${item.room.id} · 空闲`
+              : `${item.room.id} · ${item.occupiedCount}/${item.totalCount} 节有课${item.firstCourse ? '\n' + item.firstCourse.c : ''}`"
+            class="relative rounded-lg p-3 transition-all active:scale-95 border hover:shadow-sm"
+            :class="item.free
+              ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 dark:hover:border-emerald-700'
+              : 'bg-rose-50 border-rose-200 hover:bg-rose-100 hover:border-rose-300 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 dark:hover:border-rose-700'"
+          >
+            <span
+              v-if="isFav(item.room.id)"
+              class="absolute top-1 right-1.5 text-amber-400 text-xs"
+            >★</span>
+            <div
+              class="font-semibold"
+              :class="item.free
+                ? 'text-emerald-900 dark:text-emerald-100'
+                : 'text-rose-900 dark:text-rose-100'"
+            >{{ item.room.id }}</div>
+            <div
+              v-if="item.free"
+              class="text-[11px] mt-0.5 text-emerald-700/70 dark:text-emerald-400/80"
+            >空闲</div>
+            <div
+              v-else
+              class="text-[11px] mt-0.5 text-rose-700/80 dark:text-rose-300/80 truncate"
+            >
+              <template v-if="item.totalCount > 1">{{ item.occupiedCount }}/{{ item.totalCount }} 节 ·</template>
+              <span v-if="item.firstCourse">{{ item.firstCourse.c }}</span>
+              <span v-else>有课</span>
+            </div>
+          </RouterLink>
+        </section>
+      </template>
+    </div>
   </div>
 </template>

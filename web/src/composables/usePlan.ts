@@ -154,19 +154,11 @@ export function listBuildings(plan: Plan): string[] {
   return [...set].sort()
 }
 
-export function listTypes(plan: Plan): string[] {
-  const set = new Set<string>()
-  for (const r of plan.rooms) set.add(r.type)
-  return [...set].sort()
-}
-
 export interface RoomFilter {
-  type?: string
   building?: string
 }
 
 function matchFilter(r: Room, f: RoomFilter): boolean {
-  if (f.type && r.type !== f.type) return false
   if (f.building && buildingOf(r.id) !== f.building) return false
   return true
 }
@@ -192,6 +184,46 @@ export function findFreeRoomsInRange(
   return plan.rooms.filter(
     r => matchFilter(r, f) && slots.every(si => r.schedule[weekday][si] === null)
   )
+}
+
+export interface RoomStatus {
+  room: Room
+  /** 选中节次中被占用的节次数 */
+  occupiedCount: number
+  /** 选中节次总数 */
+  totalCount: number
+  /** 整段都空闲 */
+  free: boolean
+  /** 第一节被占用的课程,用作卡片预览 */
+  firstCourse: Course | null
+}
+
+/** 给定 (weekday, slots[]),返回所有教室及其在该范围内的占用状态 */
+export function findRoomsInRangeWithStatus(
+  plan: Plan, weekday: number, slots: number[], f: RoomFilter = {}
+): RoomStatus[] {
+  if (slots.length === 0) return []
+  const out: RoomStatus[] = []
+  for (const room of plan.rooms) {
+    if (!matchFilter(room, f)) continue
+    let occupiedCount = 0
+    let firstCourse: Course | null = null
+    for (const si of slots) {
+      const c = room.schedule[weekday][si]
+      if (c) {
+        occupiedCount++
+        if (!firstCourse) firstCourse = c
+      }
+    }
+    out.push({
+      room,
+      occupiedCount,
+      totalCount: slots.length,
+      free: occupiedCount === 0,
+      firstCourse,
+    })
+  }
+  return out
 }
 
 /** 把一组节次索引格式化为"14:00-21:20"形式的总时间区间 */

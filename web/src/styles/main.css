@@ -9,7 +9,13 @@
     text-size-adjust: 100%;
   }
   body {
-    @apply font-sans antialiased text-slate-900 bg-slate-50;
+    @apply font-sans antialiased text-slate-900 bg-slate-50 dark:text-zinc-100 dark:bg-zinc-950;
+  }
+  /* 数字与英文用 Inter,中文自动回落到 Noto Sans SC */
+  .tabular-nums,
+  .font-num {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -18,13 +24,15 @@
     @apply px-3 py-1.5 rounded-full text-sm transition-colors whitespace-nowrap;
   }
   .pill-active {
-    @apply bg-slate-900 text-white;
+    @apply bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900;
   }
   .pill-idle {
-    @apply text-slate-600 hover:bg-slate-100 active:bg-slate-200;
+    @apply text-slate-600 hover:bg-slate-100 active:bg-slate-200
+           dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700;
   }
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-slate-200/70;
+    @apply bg-white rounded-xl shadow-sm border border-slate-200/70
+           dark:bg-zinc-900 dark:border-zinc-800 dark:shadow-none;
   }
   .chip {
     @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium;

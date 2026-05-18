@@ -24,3 +24,5 @@ dist/
 *.log
 debug_*.html
 debug_*.json
+_screenshots/
+_shoot*.py

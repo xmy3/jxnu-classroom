@@ -6,8 +6,8 @@ import Heatmap from '@/pages/Heatmap.vue'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', name: 'range', component: RangeFree, meta: { title: '时段空闲' } },
-    { path: '/room', name: 'room', component: RoomTimeline, meta: { title: '教室时段' } },
+    { path: '/', name: 'range', component: RangeFree, meta: { title: '教室列表' } },
+    { path: '/room', name: 'room', component: RoomTimeline, meta: { title: '课表查询' } },
     { path: '/heatmap', name: 'heatmap', component: Heatmap, meta: { title: '占用热力图' } },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
