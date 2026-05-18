@@ -27,6 +27,9 @@ const showFilters = ref(false)
 // 是否只看空闲教室;关闭时显示全部教室,用颜色区分
 const onlyFree = ref<boolean>(false)
 
+// 手机端默认折叠左侧筛选,避免首屏被筛选框塞满
+const mobileFiltersOpen = ref(false)
+
 const { isFav } = useFavorites()
 
 const todayWi = computed(() => currentWeekdayIndex())
@@ -150,14 +153,42 @@ const weekdayLabel = computed(() => props.plan.meta.weekdays[weekday.value])
         {{ selectedLabels }}
         <span v-if="timeRangeLabel" class="text-slate-400 dark:text-zinc-500 tabular-nums ml-1">({{ timeRangeLabel }})</span>
       </span>
-      <span v-else>请在左侧选择想查的节次</span>
+      <span v-else>请展开下方筛选选择节次</span>
     </p>
   </section>
 
+  <!-- 手机端:折叠筛选触发按钮(lg 以下显示) -->
+  <button
+    @click="mobileFiltersOpen = !mobileFiltersOpen"
+    class="lg:hidden w-full mb-3 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors"
+  >
+    <span class="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-zinc-100 shrink-0">
+      <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400 dark:text-zinc-500">
+        <path d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" />
+      </svg>
+      <span>{{ mobileFiltersOpen ? '收起筛选' : '调整筛选' }}</span>
+    </span>
+    <span class="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 min-w-0">
+      <span class="truncate">
+        {{ weekdayLabel }} · {{ selectedSlots.length ? selectedLabels : '未选' }}
+      </span>
+      <svg
+        viewBox="0 0 20 20" fill="currentColor"
+        class="w-4 h-4 shrink-0 text-slate-400 dark:text-zinc-500 transition-transform"
+        :class="mobileFiltersOpen ? 'rotate-180' : ''"
+      >
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 011.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+      </svg>
+    </span>
+  </button>
+
   <!-- 双栏:lg+ 左 320 控制 / 右 结果 -->
   <div class="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-6 space-y-4 lg:space-y-0">
-    <!-- 左:控制面板 -->
-    <aside class="space-y-3 lg:sticky lg:top-16 lg:self-start lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:pr-1">
+    <!-- 左:控制面板 (手机端默认折叠) -->
+    <aside
+      class="space-y-3 lg:sticky lg:top-16 lg:self-start lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:pr-1"
+      :class="mobileFiltersOpen ? 'block' : 'hidden lg:block'"
+    >
       <!-- 周几 -->
       <section class="card p-3 sm:p-4">
         <h2 class="text-xs font-medium text-slate-500 dark:text-zinc-400 mb-2">周几</h2>
