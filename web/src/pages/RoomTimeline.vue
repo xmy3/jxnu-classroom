@@ -213,8 +213,8 @@ const busyCount = computed(() =>
                   @click="openDetail(wi, si)"
                   class="rounded p-1 text-[10px] leading-snug min-h-[2rem] cursor-pointer transition-colors
                          bg-rose-50 border border-rose-200/60 text-rose-900 hover:bg-rose-100 hover:border-rose-300
-                         dark:bg-rose-950/40 dark:border-rose-900/60 dark:text-rose-100
-                         dark:hover:bg-rose-900/40 dark:hover:border-rose-800"
+                         dark:bg-rose-950/60 dark:border-rose-900/60 dark:text-rose-100
+                         dark:hover:bg-rose-900/60 dark:hover:border-rose-800"
                 >
                   <div class="font-medium line-clamp-2">{{ selectedRoom.schedule[wi][si]!.c }}</div>
                   <div class="opacity-70 line-clamp-1">{{ selectedRoom.schedule[wi][si]!.t }}</div>
@@ -223,7 +223,7 @@ const busyCount = computed(() =>
                   v-else
                   class="rounded min-h-[2rem] flex items-center justify-center text-[10px]
                          bg-emerald-50 border border-emerald-200/60 text-emerald-600
-                         dark:bg-emerald-950/30 dark:border-emerald-900/60 dark:text-emerald-400/80"
+                         dark:bg-emerald-950/50 dark:border-emerald-900/60 dark:text-emerald-400/80"
                 >空</div>
               </td>
             </tr>

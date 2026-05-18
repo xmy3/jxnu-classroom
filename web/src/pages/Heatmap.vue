@@ -98,7 +98,7 @@ function isAllFree(room: Room): boolean {
 // 卡片色系:全天空 → 翠绿;否则跟随占用程度
 function cardTone(room: Room): string {
   if (isAllFree(room)) {
-    return 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-800/70 dark:hover:border-emerald-600'
+    return 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-400 dark:bg-emerald-950/60 dark:border-emerald-800/70 dark:hover:border-emerald-600'
   }
   return 'bg-white border-slate-200 hover:border-indigo-400 dark:bg-zinc-900 dark:border-zinc-800 dark:hover:border-indigo-500'
 }
@@ -234,14 +234,14 @@ function pulseBg(v: number): string {
     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
       热力图
     </h1>
-    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1.5">
+    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <template v-if="mode === 'day'">
-        <span v-if="isToday" class="inline-flex items-center gap-1">
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span v-if="isToday" class="inline-flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
           <span class="text-amber-700 dark:text-amber-300 font-medium">今天</span>
         </span>
         <span v-else>{{ plan.meta.weekdays[weekday] }}</span>
-        <span class="mx-1 text-slate-300 dark:text-zinc-700">·</span>
+        <span class="text-slate-300 dark:text-zinc-700">·</span>
         <span>每间教室一整天的忙闲一眼看完</span>
       </template>
       <template v-else>
@@ -391,13 +391,29 @@ function pulseBg(v: number): string {
 
   <!-- ============== Pulse 节奏条 ============== -->
   <section v-if="visibleRooms.length > 0" class="mb-6 sm:mb-7">
-    <div class="flex items-baseline justify-between mb-3">
+    <div class="flex items-center justify-between mb-3 gap-3">
       <h2 class="text-[11px] uppercase tracking-widest font-medium text-slate-400 dark:text-zinc-500">
         {{ mode === 'day' ? '今日节奏' : '本周节奏' }}
       </h2>
-      <span class="text-[10px] text-slate-400 dark:text-zinc-500">
-        颜色越深越忙 · 数字 = 占用率%
-      </span>
+      <!-- 渐变图例: 单日 2 档, 全周 6 档 -->
+      <div class="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-zinc-500">
+        <span class="hidden sm:inline">空</span>
+        <div class="flex gap-[2px]">
+          <template v-if="mode === 'day'">
+            <div class="w-3 h-3 rounded-[3px] bg-slate-200/70 dark:bg-zinc-700/50" title="空闲"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-500 dark:bg-indigo-400" title="有课"></div>
+          </template>
+          <template v-else>
+            <div class="w-3 h-3 rounded-[3px] bg-slate-200/70 dark:bg-zinc-700/50" title="0%"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-200 dark:bg-indigo-900" title="0-20%"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-300 dark:bg-indigo-700" title="20-40%"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-400 dark:bg-indigo-500" title="40-60%"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-600 dark:bg-indigo-400" title="60-80%"></div>
+            <div class="w-3 h-3 rounded-[3px] bg-indigo-800 dark:bg-indigo-200" title="80-100%"></div>
+          </template>
+        </div>
+        <span class="hidden sm:inline">{{ mode === 'day' ? '满' : '全占' }}</span>
+      </div>
     </div>
     <div class="flex items-end gap-1.5 sm:gap-2 h-20">
       <template v-for="(v, ci) in pulse" :key="ci">

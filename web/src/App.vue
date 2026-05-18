@@ -38,7 +38,8 @@ const themeLabel = computed(() =>
           class="font-semibold text-sm sm:text-base text-slate-900 dark:text-zinc-100
                  flex items-center gap-2 shrink-0">
           <BrandMark :size="20" :loading="loading && !plan" />
-          <span class="hidden sm:inline">江师大瑶湖 · 空教室</span>
+          <span class="hidden lg:inline">江西师范大学(瑶湖校区) · 空教室</span>
+          <span class="hidden sm:inline lg:hidden">江师大瑶湖 · 空教室</span>
           <span class="sm:hidden">空教室</span>
         </RouterLink>
         <nav class="flex gap-0.5 ml-auto overflow-x-auto">

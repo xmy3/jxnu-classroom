@@ -143,16 +143,16 @@ const weekdayLabel = computed(() => props.plan.meta.weekdays[weekday.value])
     <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
       {{ isToday ? '今天' : weekdayLabel }}哪些教室是空的?
     </h1>
-    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1.5">
-      <span v-if="isToday" class="inline-flex items-center gap-1">
-        <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+      <span v-if="isToday" class="inline-flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
         <span class="text-amber-700 dark:text-amber-300">实时</span>
-        ·
       </span>
-      <span v-if="selectedSlots.length">
-        {{ selectedLabels }}
-        <span v-if="timeRangeLabel" class="text-slate-400 dark:text-zinc-500 tabular-nums ml-1">({{ timeRangeLabel }})</span>
-      </span>
+      <span v-if="isToday" class="text-slate-300 dark:text-zinc-700">·</span>
+      <template v-if="selectedSlots.length">
+        <span>{{ selectedLabels }}</span>
+        <span v-if="timeRangeLabel" class="text-slate-400 dark:text-zinc-500 tabular-nums">({{ timeRangeLabel }})</span>
+      </template>
       <span v-else>请展开下方筛选选择节次</span>
     </p>
   </section>
@@ -408,8 +408,8 @@ const weekdayLabel = computed(() => props.plan.meta.weekdays[weekday.value])
               : `${item.room.id} · ${item.occupiedCount}/${item.totalCount} 节有课${item.firstCourse ? '\n' + item.firstCourse.c : ''}`"
             class="relative rounded-lg p-3 transition-all active:scale-95 border hover:shadow-sm"
             :class="item.free
-              ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50 dark:hover:border-emerald-700'
-              : 'bg-rose-50 border-rose-200 hover:bg-rose-100 hover:border-rose-300 dark:bg-rose-950/40 dark:border-rose-800/60 dark:hover:bg-rose-900/50 dark:hover:border-rose-700'"
+              ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800/60 dark:hover:bg-emerald-900/70 dark:hover:border-emerald-700'
+              : 'bg-rose-50 border-rose-200 hover:bg-rose-100 hover:border-rose-300 dark:bg-rose-950/60 dark:border-rose-800/60 dark:hover:bg-rose-900/70 dark:hover:border-rose-700'"
           >
             <span
               v-if="isFav(item.room.id)"
