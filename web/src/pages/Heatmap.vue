@@ -173,9 +173,6 @@ function groupBusy(rooms: Room[]): number {
 function groupTotal(rooms: Room[]): number {
   return rooms.length * totalSlotCount()
 }
-function groupFree(rooms: Room[]): number {
-  return groupTotal(rooms) - groupBusy(rooms)
-}
 function groupRate(rooms: Room[]): number {
   const t = groupTotal(rooms)
   return t === 0 ? 0 : groupBusy(rooms) / t
