@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { usePlan } from '@/composables/usePlan'
 import { useTheme } from '@/composables/useTheme'
 import BrandMark from '@/components/BrandMark.vue'
+import WelcomeModal from '@/components/WelcomeModal.vue'
 
 const route = useRoute()
 const { plan, loading, error, reload } = usePlan()
@@ -31,6 +32,7 @@ const themeLabel = computed(() =>
 
 <template>
   <div class="min-h-screen flex flex-col">
+    <WelcomeModal />
     <header class="bg-white/95 dark:bg-zinc-950/90 backdrop-blur
                    border-b border-slate-200 dark:border-zinc-800 sticky top-0 z-50">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-12 flex items-center gap-3">
