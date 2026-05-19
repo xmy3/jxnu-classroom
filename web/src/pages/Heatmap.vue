@@ -13,6 +13,21 @@ const mode = ref<'day' | 'week'>('day')
 const weekday = ref<number>(currentWeekdayIndex())
 const buildingFilter = ref<string>('')
 
+// 楼栋折叠状态:默认全部折叠,只保留 header 摘要
+// 筛选到单个楼栋时强制视为展开
+const expanded = ref<Set<string>>(new Set())
+
+function toggleBuilding(b: string) {
+  const s = new Set(expanded.value)
+  if (s.has(b)) s.delete(b)
+  else s.add(b)
+  expanded.value = s
+}
+
+function isExpanded(b: string): boolean {
+  return buildingFilter.value === b || expanded.value.has(b)
+}
+
 const todayWi = computed(() => currentWeekdayIndex())
 const isToday = computed(() => weekday.value === todayWi.value)
 const nowSi = computed(() => currentSlotIndex(props.plan))
@@ -36,6 +51,18 @@ const groups = computed<{ b: string; rooms: Room[] }[]>(() => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([b, rooms]) => ({ b, rooms }))
 })
+
+const allExpanded = computed(() =>
+  groups.value.length > 0 && groups.value.every(g => isExpanded(g.b))
+)
+
+function toggleAll() {
+  if (allExpanded.value) {
+    expanded.value = new Set()
+  } else {
+    expanded.value = new Set(groups.value.map(g => g.b))
+  }
+}
 
 const colCount = computed(() =>
   mode.value === 'day' ? props.plan.meta.slots.length : 7
@@ -463,9 +490,46 @@ function pulseBg(v: number): string {
   </section>
 
   <div v-else class="space-y-8 sm:space-y-10">
+    <!-- 楼栋概览 + 全部展开/收起 -->
+    <div class="flex items-center justify-between text-[11px] -mb-4 sm:-mb-6">
+      <div class="uppercase tracking-widest text-slate-400 dark:text-zinc-500">
+        共
+        <span class="text-slate-700 dark:text-zinc-200 font-bold tabular-nums normal-case tracking-normal mx-0.5">{{ groups.length }}</span>
+        栋 ·
+        <span class="text-slate-700 dark:text-zinc-200 font-bold tabular-nums normal-case tracking-normal mx-0.5">{{ totalRooms }}</span>
+        间
+      </div>
+      <button
+        @click="toggleAll"
+        type="button"
+        class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors px-2 py-1 -mr-2 rounded-md"
+      >
+        <span>{{ allExpanded ? '全部收起' : '全部展开' }}</span>
+        <svg
+          viewBox="0 0 20 20" fill="currentColor"
+          class="w-3.5 h-3.5 transition-transform"
+          :class="allExpanded ? 'rotate-90' : '-rotate-90'"
+          aria-hidden="true"
+        >
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 011.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+
     <section v-for="g in groups" :key="g.b">
-      <!-- 楼栋 header -->
-      <header class="flex items-center justify-between mb-4 sm:mb-5 gap-3">
+      <!-- 楼栋 header (整行可点击,切换展开) -->
+      <header
+        @click="toggleBuilding(g.b)"
+        role="button"
+        :aria-expanded="isExpanded(g.b)"
+        tabindex="0"
+        @keydown.enter.prevent="toggleBuilding(g.b)"
+        @keydown.space.prevent="toggleBuilding(g.b)"
+        class="flex items-center justify-between mb-4 sm:mb-5 gap-3 cursor-pointer select-none group/hdr
+               -mx-2 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-900/40
+               focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:focus-visible:ring-indigo-500
+               transition-colors"
+      >
         <div class="flex items-center gap-3 sm:gap-4 min-w-0">
           <!-- 楼栋徽章 -->
           <div
@@ -498,33 +562,49 @@ function pulseBg(v: number): string {
             </div>
           </div>
         </div>
-        <!-- 楼栋 mini 节奏 -->
-        <div class="hidden md:flex items-center gap-2 shrink-0">
-          <span class="text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-zinc-500">
-            {{ mode === 'day' ? '本日节奏' : '本周节奏' }}
-          </span>
-          <div class="flex items-end gap-[3px]">
-            <template v-for="(v, i) in groupPulse(g.rooms)" :key="i">
-              <div
-                class="w-2.5 rounded-sm transition-colors"
-                :class="pulseBg(v)"
-                :style="{ height: `${Math.max(6, v * 24)}px` }"
-                :title="(mode === 'day'
-                  ? plan.meta.slots[i]?.label
-                  : plan.meta.weekdays[i]) + ' · ' + (v*100).toFixed(0) + '%'"
-              ></div>
-              <span
-                v-if="isPeriodBreakDay(i)"
-                class="w-1 shrink-0"
-                aria-hidden="true"
-              ></span>
-            </template>
+        <div class="flex items-center gap-2.5 sm:gap-4 shrink-0">
+          <!-- 楼栋 mini 节奏 (折叠时也保留,作为概览信号) -->
+          <div class="flex items-center gap-2">
+            <span class="hidden md:inline text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-zinc-500">
+              {{ mode === 'day' ? '本日节奏' : '本周节奏' }}
+            </span>
+            <div class="flex items-end gap-[3px]">
+              <template v-for="(v, i) in groupPulse(g.rooms)" :key="i">
+                <div
+                  class="w-2.5 rounded-sm transition-colors"
+                  :class="pulseBg(v)"
+                  :style="{ height: `${Math.max(6, v * 24)}px` }"
+                  :title="(mode === 'day'
+                    ? plan.meta.slots[i]?.label
+                    : plan.meta.weekdays[i]) + ' · ' + (v*100).toFixed(0) + '%'"
+                ></div>
+                <span
+                  v-if="isPeriodBreakDay(i)"
+                  class="w-1 shrink-0"
+                  aria-hidden="true"
+                ></span>
+              </template>
+            </div>
           </div>
+          <!-- 展开/折叠箭头 -->
+          <svg
+            viewBox="0 0 20 20" fill="currentColor"
+            class="w-4 h-4 shrink-0 text-slate-400 dark:text-zinc-500
+                   group-hover/hdr:text-slate-700 dark:group-hover/hdr:text-zinc-200
+                   transition-transform"
+            :class="isExpanded(g.b) ? 'rotate-90' : ''"
+            aria-hidden="true"
+          >
+            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+          </svg>
         </div>
       </header>
 
-      <!-- 教室卡片网格 -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">
+      <!-- 教室卡片网格 (折叠时不渲染,首屏 DOM 大幅减少) -->
+      <div
+        v-if="isExpanded(g.b)"
+        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3"
+      >
         <RouterLink
           v-for="room in g.rooms"
           :key="room.id"
