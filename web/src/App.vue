@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { REQUIRED_SEMESTER, isOutdatedSemester } from '@/semester'
 import { usePlan } from '@/composables/usePlan'
 import { useTheme } from '@/composables/useTheme'
 import BrandMark from '@/components/BrandMark.vue'
@@ -9,6 +10,9 @@ import WelcomeModal from '@/components/WelcomeModal.vue'
 const route = useRoute()
 const { plan, loading, error, reload } = usePlan()
 const { mode, cycle } = useTheme()
+const showHistory = ref(false)
+const outdated = computed(() => !!plan.value && isOutdatedSemester(plan.value.meta.semester))
+watch(() => plan.value?.meta.semester, () => { showHistory.value = false })
 
 const nav = [
   { to: '/', label: '教室列表', name: 'range' },
@@ -104,12 +108,28 @@ const themeLabel = computed(() =>
           <span class="text-sm">数据加载中…</span>
         </div>
       </div>
-      <RouterView v-else-if="plan" :plan="plan" />
+      <template v-else-if="plan">
+        <div v-if="outdated" role="status"
+          class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <p class="font-semibold">本学期课表尚未获取，请勿据此判断当前空教室</p>
+          <p class="mt-2 text-sm">
+            已进入 {{ REQUIRED_SEMESTER }}，当前数据源仍提供 {{ plan.meta.semester || '未知学期' }}。
+            抓取时间不代表课表所属学期，历史课表中的“空闲”不代表现在可用。
+          </p>
+          <a href="https://jwc.jxnu.edu.cn/Portal/Index.aspx" target="_blank" rel="noopener"
+            class="mt-3 inline-block text-sm underline">前往教务在线查询最新安排</a>
+          <button type="button" @click="showHistory = !showHistory"
+            :aria-expanded="showHistory" class="ml-4 text-sm underline">
+            {{ showHistory ? '收起历史课表' : '仅查看历史课表' }}
+          </button>
+        </div>
+        <RouterView v-if="!outdated || showHistory" :plan="plan" />
+      </template>
     </main>
 
     <footer class="text-xs text-slate-500 dark:text-zinc-500 text-center py-6 px-4 max-w-6xl mx-auto w-full">
       <p v-if="plan">
-        {{ plan.meta.semester }} · 共 {{ plan.meta.room_count }} 间公共教室 · 数据更新于 {{ synced }}
+        {{ plan.meta.semester }} · 共 {{ plan.meta.room_count }} 间公共教室 · 最近抓取于 {{ synced }}
       </p>
       <p class="mt-1 opacity-70">
         以教务在线公共教室查询为准 · 临时调/补课请以辅导员通知为准

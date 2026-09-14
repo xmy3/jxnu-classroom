@@ -8,6 +8,11 @@ on:
       - 'data/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
+  # GITHUB_TOKEN 的数据提交不会触发 push 工作流，直接监听同步完成。
+  workflow_run:
+    workflows: ['Sync classroom data']
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -20,9 +25,16 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 同步任务运行期间产生的新数据提交在 main，不是其启动时的 SHA。
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4

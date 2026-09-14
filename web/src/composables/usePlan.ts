@@ -12,7 +12,7 @@ function startLoad(): Promise<Plan> {
   if (_loadPromise) return _loadPromise
   _loading.value = true
   _error.value = null
-  _loadPromise = fetch(DATA_URL)
+  _loadPromise = fetch(DATA_URL, { cache: 'no-cache' })
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status} 从 ${DATA_URL} 加载数据失败`)
       return r.json() as Promise<Plan>
