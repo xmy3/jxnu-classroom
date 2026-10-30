@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 10
 
     steps:
@@ -38,11 +38,11 @@ jobs:
 
           hostname = "jwc.jxnu.edu.cn"
           try:
-              socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
+              records = socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
           except socket.gaierror as error:
               print(f"System DNS failed for {hostname}: {error}", flush=True)
           else:
-              print(f"System DNS resolved {hostname}")
+              print(f"System DNS resolved {hostname}: {sorted({record[4][0] for record in records})}")
               raise SystemExit(0)
 
           for resolver in ("https://dns.google/resolve", "https://dns.alidns.com/resolve"):
