@@ -14,6 +14,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from urllib.parse import urlsplit
 
 import requests
 
@@ -33,6 +35,12 @@ def make_session() -> requests.Session:
     """构造一个不依赖系统代理、带浏览器 UA 的 Session。"""
     s = requests.Session()
     s.trust_env = False
+    proxy = os.environ.get("JWC_HTTPS_PROXY")
+    if proxy:
+        parsed = urlsplit(proxy)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise ValueError("JWC_HTTPS_PROXY must be an HTTP or HTTPS proxy URL")
+        s.proxies["https"] = proxy
     s.headers["User-Agent"] = DEFAULT_USER_AGENT
     s.headers["Accept-Language"] = "zh-CN,zh;q=0.9"
     return s

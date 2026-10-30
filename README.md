@@ -128,6 +128,10 @@ npm run build
 
 无需任何 secret —— 数据源是公开页面。
 
+同步任务在系统 DNS 失败时会通过 DNS over HTTPS 获取实时地址，仅写入当次运行器的 hosts，仍使用原域名校验证书。
+如果运行器能解析域名，但连接教务站持续超时，可在仓库的 Actions secrets 中配置 `JWC_HTTPS_PROXY`，指向能访问教务站的 HTTP/HTTPS 代理（例如 `http://proxy.example.com:8080`）。
+代理凭证只放在 secret 中；未配置时仍直连。代理模式下由代理解析源站域名。仅修复 DNS 无法解决源站不可达的问题，抓取失败仍会让同步任务失败并保留上次数据。
+
 同步成功后，部署工作流通过 `workflow_run` 自动构建并发布 main 的最新数据。
 不要只依赖数据提交触发 `push`：使用 `GITHUB_TOKEN` 创建的提交不会触发另一个 push 工作流。
 
