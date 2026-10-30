@@ -27,6 +27,54 @@ jobs:
         working-directory: scraper
         run: pip install -e .
 
+      - name: Resolve classroom source
+        shell: python
+        run: |
+          import ipaddress
+          import json
+          import socket
+          import subprocess
+          from urllib.request import urlopen
+
+          hostname = "jwc.jxnu.edu.cn"
+          try:
+              socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
+          except socket.gaierror as error:
+              print(f"System DNS failed for {hostname}: {error}", flush=True)
+          else:
+              print(f"System DNS resolved {hostname}")
+              raise SystemExit(0)
+
+          for resolver in ("https://dns.google/resolve", "https://dns.alidns.com/resolve"):
+              try:
+                  with urlopen(f"{resolver}?name={hostname}&type=A", timeout=15) as response:
+                      result = json.load(response)
+                  if result.get("Status") != 0:
+                      raise ValueError(f"DNS response status: {result.get('Status')}")
+                  addresses = [
+                      ipaddress.IPv4Address(record["data"])
+                      for record in result.get("Answer", [])
+                      if record.get("type") == 1
+                  ]
+                  addresses = [str(address) for address in addresses if address.is_global]
+                  if not addresses:
+                      raise ValueError("DNS response contains no public IPv4 addresses")
+              except (OSError, ValueError, KeyError) as error:
+                  print(f"DNS fallback {resolver} failed: {error}", flush=True)
+                  continue
+
+              subprocess.run(
+                  ["sudo", "tee", "-a", "/etc/hosts"],
+                  input="\n" + "".join(f"{address} {hostname}\n" for address in addresses),
+                  text=True,
+                  check=True,
+              )
+              socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
+              print(f"Resolved {hostname} using {resolver}")
+              break
+          else:
+              raise SystemExit(f"Unable to resolve {hostname}; classroom data was not changed")
+
       - name: Sync classroom data
         run: |
           python -m jxnu_classroom.cli sync -v --output data/classrooms.json
