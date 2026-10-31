@@ -1,108 +1,95 @@
 name: Sync classroom data
 
 on:
-  schedule:
-    # 每天北京时间 06:17(UTC 22:17),错峰避开服务器整点压力
-    - cron: '17 22 * * *'
-  workflow_dispatch:    # 允许手动触发
+  workflow_dispatch:
+    inputs:
+      transport:
+        type: choice
+        options: [teredo, warp]
+        default: teredo
+        required: true
 
 permissions:
-  contents: write       # 允许 commit 回 main
+  contents: read
 
 jobs:
-  sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+  probe:
+    runs-on: ${{ inputs.transport == 'teredo' && 'windows-latest' || 'ubuntu-24.04' }}
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
+      - run: python -m pip install ./scraper
 
-      - name: Install scraper
-        working-directory: scraper
-        run: pip install -e .
+      - name: Fetch over Windows IPv6
+        if: inputs.transport == 'teredo'
+        shell: pwsh
+        run: |
+          Start-Service iphlpsvc
+          netsh interface teredo set state type=enterpriseclient
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $site = 'jwc.jxnu.edu.cn'
+          $dns = Invoke-RestMethod "https://dns.google/resolve?name=$site&type=AAAA"
+          $address = ($dns.Answer | Where-Object type -eq 28 | Select-Object -First 1).data
+          if (-not $address) { throw 'Source AAAA record missing' }
+          try {
+            foreach ($page in 1, 2) {
+              $file = Join-Path $env:RUNNER_TEMP "classroom-$page.html"
+              curl.exe --fail --silent --show-error --ipv6 --noproxy '*' --resolve ("{0}:443:[{1}]" -f $site,$address) --connect-timeout 10 --max-time 40 --retry 2 --retry-delay 5 --retry-all-errors -o $file "https://$site/MyControl/Public_ClassRoom.aspx?t=$page"
+              if ($LASTEXITCODE -ne 0) { throw "Source fetch failed for t=$page" }
+            }
+          } finally {
+            netsh interface teredo show state
+          }
 
-      - name: Resolve classroom source
-        env:
-          JWC_HTTPS_PROXY: ${{ secrets.JWC_HTTPS_PROXY }}
+      - name: Fetch over WARP local proxy
+        if: inputs.transport == 'warp'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/cloudflare-warp.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/cloudflare-warp.gpg] https://pkg.cloudflareclient.com/ noble main' | sudo tee /etc/apt/sources.list.d/cloudflare-warp.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cloudflare-warp
+          sudo systemctl start warp-svc
+          sudo warp-cli --accept-tos registration new
+          trap 'sudo warp-cli --accept-tos disconnect; sudo warp-cli --accept-tos registration delete' EXIT
+          sudo warp-cli --accept-tos mode proxy
+          sudo warp-cli --accept-tos proxy port 40000
+          sudo warp-cli --accept-tos connect
+          trace="https://www.cloudflare.com/cdn-cgi/trace"
+          ready=false
+          for attempt in {1..12}; do
+            if curl -fsS --proxy socks5h://127.0.0.1:40000 --max-time 5 "$trace" | grep -qx 'warp=on'; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != true ]]; then exit 1; fi
+          for page in 1 2; do
+            curl -fsS --proxy socks5h://127.0.0.1:40000 --connect-timeout 12 --max-time 45 -o "$RUNNER_TEMP/classroom-$page.html" "https://jwc.jxnu.edu.cn/MyControl/Public_ClassRoom.aspx?t=$page"
+          done
+
+      - name: Validate both live timetables
         shell: python
         run: |
-          import ipaddress
-          import json
           import os
-          import socket
-          import subprocess
-          from urllib.request import urlopen
+          from pathlib import Path
+          from jxnu_classroom.parser import parse
+          from jxnu_classroom.builder import merge_pages
 
-          if os.environ.get("JWC_HTTPS_PROXY"):
-              print("Source DNS will be resolved by the configured HTTPS proxy")
-              raise SystemExit(0)
-
-          hostname = "jwc.jxnu.edu.cn"
-          try:
-              records = socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
-          except socket.gaierror as error:
-              print(f"System DNS failed for {hostname}: {error}", flush=True)
-          else:
-              print(f"System DNS resolved {hostname}: {sorted({record[4][0] for record in records})}")
-              raise SystemExit(0)
-
-          for resolver in ("https://dns.google/resolve", "https://dns.alidns.com/resolve"):
-              try:
-                  with urlopen(f"{resolver}?name={hostname}&type=A", timeout=15) as response:
-                      result = json.load(response)
-                  if result.get("Status") != 0:
-                      raise ValueError(f"DNS response status: {result.get('Status')}")
-                  addresses = [
-                      ipaddress.IPv4Address(record["data"])
-                      for record in result.get("Answer", [])
-                      if record.get("type") == 1
-                  ]
-                  addresses = [str(address) for address in addresses if address.is_global]
-                  if not addresses:
-                      raise ValueError("DNS response contains no public IPv4 addresses")
-              except (OSError, ValueError, KeyError) as error:
-                  print(f"DNS fallback {resolver} failed: {error}", flush=True)
-                  continue
-
-              subprocess.run(
-                  ["sudo", "tee", "-a", "/etc/hosts"],
-                  input="\n" + "".join(f"{address} {hostname}\n" for address in addresses),
-                  text=True,
-                  check=True,
-              )
-              socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
-              print(f"Resolved {hostname} using {resolver}")
-              break
-          else:
-              raise SystemExit(f"Unable to resolve {hostname}; classroom data was not changed")
-
-      - name: Sync classroom data
-        env:
-          JWC_HTTPS_PROXY: ${{ secrets.JWC_HTTPS_PROXY }}
-        run: |
-          python -m jxnu_classroom.cli sync -v --output data/classrooms.json
-        working-directory: ${{ github.workspace }}
-
-      - name: Check for changes
-        id: diff
-        run: |
-          if git diff --quiet data/classrooms.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit & push
-        if: steps.diff.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/classrooms.json
-          git commit -m "data: sync classroom data ($(date -u +%Y-%m-%d))"
-          git push
+          directory = Path(os.environ["RUNNER_TEMP"])
+          pages = []
+          for page_no in (1, 2):
+              page = parse((directory / f"classroom-{page_no}.html").read_text(encoding="utf-8"))
+              if not page.rooms or not page.semester:
+                  raise SystemExit(f"Invalid timetable on page {page_no}")
+              pages.append(page)
+              print(f"Page {page_no}: {len(page.rooms)} rooms")
+          merged = merge_pages(pages)
+          print(f"Merged {len(merged.rooms)} rooms")
