@@ -12,7 +12,7 @@ def test_session_ignores_implicit_system_proxy(monkeypatch):
         assert session.verify is True
 
 
-@pytest.mark.parametrize("scheme", ["http", "https"])
+@pytest.mark.parametrize("scheme", ["http", "https", "socks5h"])
 def test_session_uses_explicit_proxy_without_disabling_tls(monkeypatch, scheme):
     proxy = f"{scheme}://proxy.example.com:8080"
     monkeypatch.setenv("JWC_HTTPS_PROXY", proxy)
@@ -24,5 +24,5 @@ def test_session_uses_explicit_proxy_without_disabling_tls(monkeypatch, scheme):
 @pytest.mark.parametrize("proxy", ["socks5://proxy.example.com:1080", "http://", "invalid"])
 def test_session_rejects_unsupported_proxy(monkeypatch, proxy):
     monkeypatch.setenv("JWC_HTTPS_PROXY", proxy)
-    with pytest.raises(ValueError, match="must be an HTTP or HTTPS proxy URL"):
+    with pytest.raises(ValueError, match="must be an HTTP, HTTPS or SOCKS5H proxy URL"):
         make_session()

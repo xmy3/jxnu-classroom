@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "江西师范大学空闲教室查询 - 教务系统爬虫"
 requires-python = ">=3.10"
 dependencies = [
-    "requests>=2.31",
+    "requests[socks]>=2.31",
     "cryptography>=42.0",
     "lxml>=5.0",
     "python-dotenv>=1.0",

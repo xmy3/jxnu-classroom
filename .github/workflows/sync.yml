@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -27,67 +27,37 @@ jobs:
         working-directory: scraper
         run: pip install -e .
 
-      - name: Resolve classroom source
-        env:
-          JWC_HTTPS_PROXY: ${{ secrets.JWC_HTTPS_PROXY }}
-        shell: python
-        run: |
-          import ipaddress
-          import json
-          import os
-          import socket
-          import subprocess
-          from urllib.request import urlopen
-
-          if os.environ.get("JWC_HTTPS_PROXY"):
-              print("Source DNS will be resolved by the configured HTTPS proxy")
-              raise SystemExit(0)
-
-          hostname = "jwc.jxnu.edu.cn"
-          try:
-              records = socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
-          except socket.gaierror as error:
-              print(f"System DNS failed for {hostname}: {error}", flush=True)
-          else:
-              print(f"System DNS resolved {hostname}: {sorted({record[4][0] for record in records})}")
-              raise SystemExit(0)
-
-          for resolver in ("https://dns.google/resolve", "https://dns.alidns.com/resolve"):
-              try:
-                  with urlopen(f"{resolver}?name={hostname}&type=A", timeout=15) as response:
-                      result = json.load(response)
-                  if result.get("Status") != 0:
-                      raise ValueError(f"DNS response status: {result.get('Status')}")
-                  addresses = [
-                      ipaddress.IPv4Address(record["data"])
-                      for record in result.get("Answer", [])
-                      if record.get("type") == 1
-                  ]
-                  addresses = [str(address) for address in addresses if address.is_global]
-                  if not addresses:
-                      raise ValueError("DNS response contains no public IPv4 addresses")
-              except (OSError, ValueError, KeyError) as error:
-                  print(f"DNS fallback {resolver} failed: {error}", flush=True)
-                  continue
-
-              subprocess.run(
-                  ["sudo", "tee", "-a", "/etc/hosts"],
-                  input="\n" + "".join(f"{address} {hostname}\n" for address in addresses),
-                  text=True,
-                  check=True,
-              )
-              socket.getaddrinfo(hostname, 443, family=socket.AF_INET)
-              print(f"Resolved {hostname} using {resolver}")
-              break
-          else:
-              raise SystemExit(f"Unable to resolve {hostname}; classroom data was not changed")
-
       - name: Sync classroom data
         env:
           JWC_HTTPS_PROXY: ${{ secrets.JWC_HTTPS_PROXY }}
+        shell: bash
         run: |
+          set -euo pipefail
+          if [[ -z "$JWC_HTTPS_PROXY" ]]; then
+            curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/cloudflare-warp.gpg
+            echo 'deb [signed-by=/usr/share/keyrings/cloudflare-warp.gpg] https://pkg.cloudflareclient.com/ noble main' | sudo tee /etc/apt/sources.list.d/cloudflare-warp.list
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq cloudflare-warp
+            sudo systemctl start warp-svc
+            sudo warp-cli --accept-tos registration new
+            trap 'sudo warp-cli --accept-tos disconnect || true; sudo warp-cli --accept-tos registration delete' EXIT
+            sudo warp-cli --accept-tos mode proxy
+            sudo warp-cli --accept-tos proxy port 40000
+            sudo warp-cli --accept-tos connect
+            export JWC_HTTPS_PROXY=socks5h://127.0.0.1:40000
+            for attempt in {1..12}; do
+              if curl -fsS --proxy "$JWC_HTTPS_PROXY" --max-time 5 https://www.cloudflare.com/cdn-cgi/trace | grep -qx 'warp=on'; then
+                echo "WARP connected"
+                break
+              fi
+              if (( attempt == 12 )); then
+                echo "::error::WARP proxy did not become ready"
+                exit 1
+              fi
+              sleep 2
+            done
+          fi
           python -m jxnu_classroom.cli sync -v --output data/classrooms.json
-        working-directory: ${{ github.workspace }}
 
       - name: Check for changes
         id: diff

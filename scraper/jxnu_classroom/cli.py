@@ -80,14 +80,15 @@ def cmd_sync(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"抓取 t={t} 失败: {type(e).__name__}: {e}", file=sys.stderr)
             return 1
-        pages.append(parse(html_text))
+        page = parse(html_text)
+        if not page.rooms or not page.semester:
+            print(f"教室页 t={t} 缺少教室或学期，已停止同步", file=sys.stderr)
+            return 1
+        print(f"教室页 t={t}：{len(page.rooms)} 间，{page.semester}")
+        pages.append(page)
         sources.append(f"{PUBLIC_CLASSROOM_URL}?t={t}")
 
     merged = merge_pages(pages)
-    if not merged.rooms:
-        print("解析后没有任何教室,可能页面结构发生变化", file=sys.stderr)
-        return 1
-
     data = build(merged, source_urls=sources)
     out_path = Path(args.output).resolve()
     write_json(data, out_path, pretty=args.pretty)

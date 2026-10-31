@@ -38,8 +38,8 @@ def make_session() -> requests.Session:
     proxy = os.environ.get("JWC_HTTPS_PROXY")
     if proxy:
         parsed = urlsplit(proxy)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            raise ValueError("JWC_HTTPS_PROXY must be an HTTP or HTTPS proxy URL")
+        if parsed.scheme not in ("http", "https", "socks5h") or not parsed.hostname:
+            raise ValueError("JWC_HTTPS_PROXY must be an HTTP, HTTPS or SOCKS5H proxy URL")
         s.proxies["https"] = proxy
     s.headers["User-Agent"] = DEFAULT_USER_AGENT
     s.headers["Accept-Language"] = "zh-CN,zh;q=0.9"
