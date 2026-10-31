@@ -24,6 +24,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install ./scraper
+      - if: inputs.transport == 'warp'
+        run: python -m pip install "requests[socks]"
 
       - name: Fetch over Windows IPv6
         if: inputs.transport == 'teredo'
@@ -71,9 +73,19 @@ jobs:
             sleep 2
           done
           if [[ "$ready" != true ]]; then exit 1; fi
-          for page in 1 2; do
-            curl -fsS --proxy socks5h://127.0.0.1:40000 --connect-timeout 12 --max-time 45 -o "$RUNNER_TEMP/classroom-$page.html" "https://jwc.jxnu.edu.cn/MyControl/Public_ClassRoom.aspx?t=$page"
-          done
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from jxnu_classroom.jwc import fetch_public_classroom, make_session
+
+          directory = Path(os.environ["RUNNER_TEMP"])
+          with make_session() as session:
+              session.proxies["https"] = "socks5h://127.0.0.1:40000"
+              for page_no in (1, 2):
+                  html = fetch_public_classroom(page_no, session=session)
+                  print(f"Fetched page {page_no}: {len(html)} characters", flush=True)
+                  (directory / f"classroom-{page_no}.html").write_text(html, encoding="utf-8")
+          PY
 
       - name: Validate both live timetables
         shell: python
@@ -87,9 +99,9 @@ jobs:
           pages = []
           for page_no in (1, 2):
               page = parse((directory / f"classroom-{page_no}.html").read_text(encoding="utf-8"))
+              print(f"Page {page_no}: {len(page.rooms)} rooms, semester present={bool(page.semester)}", flush=True)
               if not page.rooms or not page.semester:
                   raise SystemExit(f"Invalid timetable on page {page_no}")
               pages.append(page)
-              print(f"Page {page_no}: {len(page.rooms)} rooms")
           merged = merge_pages(pages)
           print(f"Merged {len(merged.rooms)} rooms")
